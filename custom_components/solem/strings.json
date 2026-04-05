@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solem Irrigation",
+        "description": "Open Proxyman on your iPhone, start the mysolem app, and copy the Bearer token and session cookie from the request headers.",
+        "data": {
+          "token": "Bearer Token (from Authorization header)",
+          "session_cookie": "Session Cookie (solem-irrigation-platform.sid value)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid or expired token.",
+      "cannot_connect": "Cannot connect to mysolem.com.",
+      "no_relay_found": "No WiFi relay (LRMB10) found in your account.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Solem relay is already configured."
+    }
+  }
+}

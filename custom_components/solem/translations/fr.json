@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Arrosage Solem",
+        "description": "Ouvrez Proxyman sur iPhone, lancez l'app mysolem, puis copiez le token Bearer et le cookie de session depuis les headers de requête.",
+        "data": {
+          "token": "Bearer Token (header Authorization)",
+          "session_cookie": "Cookie de session (valeur de solem-irrigation-platform.sid)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Token invalide ou expiré.",
+      "cannot_connect": "Impossible de se connecter à mysolem.com.",
+      "no_relay_found": "Aucune passerelle WiFi (LRMB10) trouvée.",
+      "unknown": "Erreur inattendue."
+    },
+    "abort": {
+      "already_configured": "Cette passerelle Solem est déjà configurée."
+    }
+  }
+}
