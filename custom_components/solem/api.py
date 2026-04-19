@@ -47,6 +47,8 @@ class SolemAPI:
     def __init__(self, session: aiohttp.ClientSession) -> None:
         self._session = session
         self._token: str | None = None
+        self._username: str | None = None
+        self._password: str | None = None
 
     # ------------------------------------------------------------------
     # Authentication
@@ -85,6 +87,8 @@ class SolemAPI:
                     )
                 result = await resp.json()
                 self._token = result["access_token"]
+                self._username = username
+                self._password = password
                 _LOGGER.debug("Solem authentication successful, cookie jar updated")
                 return self._token
         except aiohttp.ClientError as err:
@@ -179,11 +183,17 @@ class SolemAPI:
     ) -> dict[str, Any]:
         """POST /api/module/{relay_serial}/manual/{controller_suffix}
 
-        Requires session cookie. Body: {"watering": {...}}.
-        Response: real-time state from controller including temperature.
+        Requires session cookie. Retries once with fresh auth if session expired.
         """
         path = f"module/{relay_serial}/manual/{controller_suffix}"
-        return await self._post_path(path, json={"watering": watering})
+        try:
+            return await self._post_path(path, json={"watering": watering})
+        except SolemAuthError:
+            if self._username and self._password:
+                _LOGGER.warning("Solem: session expirée, re-authentification en cours…")
+                await self.authenticate(self._username, self._password)
+                return await self._post_path(path, json={"watering": watering})
+            raise
 
     async def _report_command(
         self, controller_id: str, command: dict[str, Any]

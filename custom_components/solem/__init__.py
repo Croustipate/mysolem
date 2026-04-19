@@ -16,7 +16,7 @@ from .coordinator import SolemCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SWITCH, Platform.SENSOR, Platform.NUMBER]
+PLATFORMS = [Platform.SWITCH, Platform.SENSOR, Platform.NUMBER, Platform.BUTTON]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -6,17 +6,16 @@ from typing import Any
 
 import aiohttp
 import voluptuous as vol
+from yarl import URL
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME
+from homeassistant.const import CONF_TOKEN
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .api import SolemAPI, SolemAuthError, SolemAPIError
-from .const import CONF_SESSION_COOKIE, DOMAIN
+from .const import API_BASE, CONF_SESSION_COOKIE, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
-CONF_SESSION_COOKIE = "session_cookie"
 
 STEP_SCHEMA = vol.Schema({
     vol.Required(CONF_TOKEN): TextSelector(
@@ -42,12 +41,12 @@ class SolemConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             token = user_input[CONF_TOKEN].strip()
             cookie = user_input[CONF_SESSION_COOKIE].strip()
 
-            session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
+            session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True))
             api = SolemAPI(session)
             api._token = token
-            # Inject session cookie so /manual/ endpoint works
             session.cookie_jar.update_cookies(
                 {"solem-irrigation-platform.sid": cookie},
+                response_url=URL(API_BASE),
             )
             try:
                 data = await api.get_user_with_modules()

@@ -91,21 +91,33 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
                 self._zone_index, DEFAULT_ZONE_DURATION
             )
         )
-        await self.coordinator.api.manual_start_zone(
-            relay_serial=self.coordinator.relay_serial,
-            controller_suffix=self.coordinator.data["controller_suffix"],
-            zone=self._zone_number,
-            duration_minutes=duration,
-            controller_id=self.coordinator.data["controller_id"],
-        )
+        _LOGGER.debug("Zone %s turn_on called, duration=%s min", self._zone_number, duration)
+        try:
+            await self.coordinator.api.manual_start_zone(
+                relay_serial=self.coordinator.relay_serial,
+                controller_suffix=self.coordinator.data["controller_suffix"],
+                zone=self._zone_number,
+                duration_minutes=duration,
+                controller_id=self.coordinator.data["controller_id"],
+            )
+            _LOGGER.debug("Zone %s start command sent successfully", self._zone_number)
+        except Exception as err:
+            _LOGGER.error("Zone %s failed to start: %s", self._zone_number, err)
+            raise
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.api.manual_stop(
-            relay_serial=self.coordinator.relay_serial,
-            controller_suffix=self.coordinator.data["controller_suffix"],
-            controller_id=self.coordinator.data["controller_id"],
-        )
+        _LOGGER.debug("Zone %s turn_off called", self._zone_number)
+        try:
+            await self.coordinator.api.manual_stop(
+                relay_serial=self.coordinator.relay_serial,
+                controller_suffix=self.coordinator.data["controller_suffix"],
+                controller_id=self.coordinator.data["controller_id"],
+            )
+            _LOGGER.debug("Zone %s stop command sent successfully", self._zone_number)
+        except Exception as err:
+            _LOGGER.error("Zone %s failed to stop: %s", self._zone_number, err)
+            raise
         await self.coordinator.async_request_refresh()
 
 
