@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -53,6 +54,10 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
 
     ON  → start zone manually for configured duration (default 10 min)
     OFF → stop all watering
+
+    Uses optimistic state so the switch turns colored immediately on click,
+    before the LoRa radio confirms the state change (can take up to 2-5 min).
+    The coordinator poll then takes over and reflects the real device state.
     """
 
     _attr_icon = "mdi:sprinkler"
@@ -65,14 +70,39 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
         self._attr_unique_id = f"solem_zone_{output['id']}"
         self._attr_name = output.get("name", f"Zone {self._zone_number}")
         self._attr_device_info = _device_info(coordinator)
+        self._optimistic_on: bool | None = None
+        self._optimistic_at: datetime | None = None
 
-    @property
-    def is_on(self) -> bool:
+    def _coordinator_is_on(self) -> bool:
         status = self.coordinator.data.get("status", {})
         return (
             status.get("state") == WATERING_STATE_ON
             and status.get("runningStation") == self._zone_number
         )
+
+    @property
+    def is_on(self) -> bool:
+        if self._optimistic_on is not None:
+            return self._optimistic_on
+        return self._coordinator_is_on()
+
+    def _handle_coordinator_update(self) -> None:
+        """Clear optimistic state once the coordinator confirms the real state."""
+        if self._optimistic_on is not None:
+            actual = self._coordinator_is_on()
+            if self._optimistic_on == actual:
+                self._optimistic_on = None
+                self._optimistic_at = None
+            else:
+                # Keep optimistic until confirmed or until 5 min timeout
+                age = (
+                    (datetime.now(timezone.utc) - self._optimistic_at).total_seconds()
+                    if self._optimistic_at else 999
+                )
+                if age > 300:
+                    self._optimistic_on = None
+                    self._optimistic_at = None
+        super()._handle_coordinator_update()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -92,6 +122,9 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
             )
         )
         _LOGGER.debug("Zone %s turn_on called, duration=%s min", self._zone_number, duration)
+        self._optimistic_on = True
+        self._optimistic_at = datetime.now(timezone.utc)
+        self.async_write_ha_state()
         try:
             await self.coordinator.api.manual_start_zone(
                 relay_serial=self.coordinator.relay_serial,
@@ -102,12 +135,18 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
             )
             _LOGGER.debug("Zone %s start command sent successfully", self._zone_number)
         except Exception as err:
+            self._optimistic_on = None
+            self._optimistic_at = None
+            self.async_write_ha_state()
             _LOGGER.error("Zone %s failed to start: %s", self._zone_number, err)
             raise
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         _LOGGER.debug("Zone %s turn_off called", self._zone_number)
+        self._optimistic_on = False
+        self._optimistic_at = datetime.now(timezone.utc)
+        self.async_write_ha_state()
         try:
             await self.coordinator.api.manual_stop(
                 relay_serial=self.coordinator.relay_serial,
@@ -116,6 +155,9 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
             )
             _LOGGER.debug("Zone %s stop command sent successfully", self._zone_number)
         except Exception as err:
+            self._optimistic_on = None
+            self._optimistic_at = None
+            self.async_write_ha_state()
             _LOGGER.error("Zone %s failed to stop: %s", self._zone_number, err)
             raise
         await self.coordinator.async_request_refresh()
@@ -134,14 +176,37 @@ class SolemProgramSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
         self._attr_unique_id = f"solem_program_{program['id']}"
         self._attr_name = program.get("name", f"Programme {chr(65 + self._program_index)}")
         self._attr_device_info = _device_info(coordinator)
+        self._optimistic_on: bool | None = None
+        self._optimistic_at: datetime | None = None
 
-    @property
-    def is_on(self) -> bool:
+    def _coordinator_is_on(self) -> bool:
         status = self.coordinator.data.get("status", {})
         return (
             status.get("state") == WATERING_STATE_ON
             and status.get("runningProgram") == self._program_number
         )
+
+    @property
+    def is_on(self) -> bool:
+        if self._optimistic_on is not None:
+            return self._optimistic_on
+        return self._coordinator_is_on()
+
+    def _handle_coordinator_update(self) -> None:
+        if self._optimistic_on is not None:
+            actual = self._coordinator_is_on()
+            if self._optimistic_on == actual:
+                self._optimistic_on = None
+                self._optimistic_at = None
+            else:
+                age = (
+                    (datetime.now(timezone.utc) - self._optimistic_at).total_seconds()
+                    if self._optimistic_at else 999
+                )
+                if age > 300:
+                    self._optimistic_on = None
+                    self._optimistic_at = None
+        super()._handle_coordinator_update()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -155,18 +220,36 @@ class SolemProgramSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.coordinator.api.manual_run_program(
-            relay_serial=self.coordinator.relay_serial,
-            controller_suffix=self.coordinator.data["controller_suffix"],
-            program=self._program_number,
-            controller_id=self.coordinator.data["controller_id"],
-        )
+        self._optimistic_on = True
+        self._optimistic_at = datetime.now(timezone.utc)
+        self.async_write_ha_state()
+        try:
+            await self.coordinator.api.manual_run_program(
+                relay_serial=self.coordinator.relay_serial,
+                controller_suffix=self.coordinator.data["controller_suffix"],
+                program=self._program_number,
+                controller_id=self.coordinator.data["controller_id"],
+            )
+        except Exception as err:
+            self._optimistic_on = None
+            self._optimistic_at = None
+            self.async_write_ha_state()
+            raise
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.coordinator.api.manual_stop(
-            relay_serial=self.coordinator.relay_serial,
-            controller_suffix=self.coordinator.data["controller_suffix"],
-            controller_id=self.coordinator.data["controller_id"],
-        )
+        self._optimistic_on = False
+        self._optimistic_at = datetime.now(timezone.utc)
+        self.async_write_ha_state()
+        try:
+            await self.coordinator.api.manual_stop(
+                relay_serial=self.coordinator.relay_serial,
+                controller_suffix=self.coordinator.data["controller_suffix"],
+                controller_id=self.coordinator.data["controller_id"],
+            )
+        except Exception as err:
+            self._optimistic_on = None
+            self._optimistic_at = None
+            self.async_write_ha_state()
+            raise
         await self.coordinator.async_request_refresh()
