@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -23,13 +23,18 @@ async def async_setup_entry(
     coordinator: SolemCoordinator = hass.data[DOMAIN][entry.entry_id]
     ctrl_id = coordinator.data.get("controller_id", entry.entry_id)
 
-    async_add_entities([
+    entities: list[SensorEntity] = [
         SolemWateringStateSensor(coordinator, ctrl_id),
         SolemRunningStationSensor(coordinator, ctrl_id),
         SolemRunningProgramSensor(coordinator, ctrl_id),
         SolemLastCommunicationSensor(coordinator, ctrl_id),
         SolemLastProgramSensor(coordinator, ctrl_id),
-    ])
+    ]
+
+    for output in coordinator.data.get("outputs", []):
+        entities.append(SolemZoneLastRunSensor(coordinator, output))
+
+    async_add_entities(entities)
 
 
 def _device_info(coordinator: SolemCoordinator) -> DeviceInfo:
@@ -178,3 +183,34 @@ class SolemLastProgramSensor(_SolemSensorBase):
         if duration is not None:
             attrs["duration_minutes"] = duration
         return attrs
+
+
+class SolemZoneLastRunSensor(CoordinatorEntity[SolemCoordinator], SensorEntity):
+    """Timestamp of the last time this zone was watered (manual or program)."""
+
+    _attr_icon = "mdi:clock-outline"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: SolemCoordinator, output: dict[str, Any]) -> None:
+        super().__init__(coordinator)
+        self._zone_index = output["index"]
+        self._zone_number = self._zone_index + 1
+        zone_name = output.get("name", f"Zone {self._zone_number}")
+        self._attr_unique_id = f"solem_zone_{output['id']}_last_run"
+        self._attr_name = f"{zone_name} Dernier arrosage"
+        self._attr_device_info = _device_info(coordinator)
+
+    @property
+    def native_value(self) -> datetime | None:
+        last_run = self.coordinator.data.get("zone_last_run", {})
+        ts = last_run.get(self._zone_number)
+        if ts and ts.tzinfo is None:
+            return ts.replace(tzinfo=timezone.utc)
+        return ts
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        duration = self.coordinator.data.get("zone_last_duration", {}).get(self._zone_number)
+        if duration is not None:
+            return {"duration_minutes": duration}
+        return {}

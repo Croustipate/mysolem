@@ -51,6 +51,11 @@ class SolemCoordinator(DataUpdateCoordinator):
         self._last_program_name: str | None = None
         self._last_program_start: datetime | None = None
         self._last_program_duration_minutes: int | None = None
+        # Per-zone last run tracking (zone_number → datetime/duration)
+        self._zone_running: int = 0             # zone number currently running (1-based)
+        self._zone_start: datetime | None = None
+        self._zone_last_run: dict[int, datetime] = {}           # zone_number → start time
+        self._zone_last_duration: dict[int, int] = {}           # zone_number → minutes
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
@@ -86,11 +91,9 @@ class SolemCoordinator(DataUpdateCoordinator):
         running_prog = status.get("runningProgram", 0)
 
         if running_prog and not self._program_running:
-            # Program just started
             self._program_running = running_prog
             self._program_start = now
         elif not running_prog and self._program_running:
-            # Program just ended — record history
             prog = next(
                 (p for p in programs if p.get("index") == self._program_running - 1),
                 None,
@@ -106,6 +109,21 @@ class SolemCoordinator(DataUpdateCoordinator):
             self._program_running = 0
             self._program_start = None
 
+        # Track per-zone last run (manual or via program)
+        running_station = status.get("runningStation", 0)
+        if running_station and running_station != self._zone_running:
+            # New zone started
+            self._zone_running = running_station
+            self._zone_start = now
+        elif not running_station and self._zone_running:
+            # Zone just stopped — record history
+            if self._zone_start:
+                elapsed = now - self._zone_start
+                self._zone_last_duration[self._zone_running] = max(1, round(elapsed.total_seconds() / 60))
+            self._zone_last_run[self._zone_running] = self._zone_start or now
+            self._zone_running = 0
+            self._zone_start = None
+
         return {
             "relay": inventory,
             "controller": controller,
@@ -118,6 +136,8 @@ class SolemCoordinator(DataUpdateCoordinator):
             "last_program_name": self._last_program_name,
             "last_program_start": self._last_program_start,
             "last_program_duration_minutes": self._last_program_duration_minutes,
+            "zone_last_run": dict(self._zone_last_run),
+            "zone_last_duration": dict(self._zone_last_duration),
         }
 
     async def _fetch_outputs(self) -> None:
