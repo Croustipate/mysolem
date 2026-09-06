@@ -3,10 +3,10 @@
   "name": "Solem Irrigation",
   "version": "1.0.0",
   "config_flow": true,
-  "documentation": "https://github.com/your-username/ha-solem",
-  "issue_tracker": "https://github.com/your-username/ha-solem/issues",
+  "documentation": "https://github.com/Croustipate/mysolem",
+  "issue_tracker": "https://github.com/Croustipate/mysolem/issues",
   "requirements": [],
   "dependencies": [],
-  "codeowners": [],
+  "codeowners": ["@Croustipate"],
   "iot_class": "cloud_polling"
 }
