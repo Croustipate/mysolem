@@ -8,6 +8,22 @@
           "token": "Bearer Token (from Authorization header)",
           "session_cookie": "Session Cookie (solem-irrigation-platform.sid value)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Solem token expired",
+        "description": "The mysolem.com token is no longer valid. Capture a new Bearer token and session cookie with Proxyman and paste them here.",
+        "data": {
+          "token": "Bearer Token (from Authorization header)",
+          "session_cookie": "Session Cookie (solem-irrigation-platform.sid value)"
+        }
+      },
+      "reconfigure": {
+        "title": "Update Solem credentials",
+        "description": "Paste a new Bearer token and session cookie captured with Proxyman.",
+        "data": {
+          "token": "Bearer Token (from Authorization header)",
+          "session_cookie": "Session Cookie (solem-irrigation-platform.sid value)"
+        }
       }
     },
     "error": {
@@ -17,7 +33,10 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This Solem relay is already configured."
+      "already_configured": "This Solem relay is already configured.",
+      "reauth_successful": "Credentials updated.",
+      "reconfigure_successful": "Credentials updated.",
+      "wrong_account": "These credentials belong to a different Solem relay."
     }
   }
 }

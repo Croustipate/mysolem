@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import SolemAPI, SolemAPIError, SolemAuthError
@@ -67,7 +68,7 @@ class SolemCoordinator(DataUpdateCoordinator):
                 await self._fetch_outputs()
 
         except SolemAuthError as err:
-            raise UpdateFailed(f"Authentication error: {err}") from err
+            raise ConfigEntryAuthFailed(f"Authentication error: {err}") from err
         except SolemAPIError as err:
             raise UpdateFailed(f"API error: {err}") from err
 
@@ -162,5 +163,7 @@ class SolemCoordinator(DataUpdateCoordinator):
                 )
             else:
                 _LOGGER.warning("Solem: no lr-is controller found in modules")
+        except SolemAuthError:
+            raise
         except SolemAPIError as err:
             _LOGGER.warning("Solem: could not fetch outputs: %s", err)

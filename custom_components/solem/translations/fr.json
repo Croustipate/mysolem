@@ -8,6 +8,22 @@
           "token": "Bearer Token (header Authorization)",
           "session_cookie": "Cookie de session (valeur de solem-irrigation-platform.sid)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Token Solem expiré",
+        "description": "Le token mysolem.com n'est plus valide. Capturez un nouveau token Bearer et le cookie de session avec Proxyman, puis collez-les ici.",
+        "data": {
+          "token": "Bearer Token (header Authorization)",
+          "session_cookie": "Cookie de session (valeur de solem-irrigation-platform.sid)"
+        }
+      },
+      "reconfigure": {
+        "title": "Mettre à jour les identifiants Solem",
+        "description": "Collez un nouveau token Bearer et le cookie de session capturés avec Proxyman.",
+        "data": {
+          "token": "Bearer Token (header Authorization)",
+          "session_cookie": "Cookie de session (valeur de solem-irrigation-platform.sid)"
+        }
       }
     },
     "error": {
@@ -17,7 +33,10 @@
       "unknown": "Erreur inattendue."
     },
     "abort": {
-      "already_configured": "Cette passerelle Solem est déjà configurée."
+      "already_configured": "Cette passerelle Solem est déjà configurée.",
+      "reauth_successful": "Identifiants mis à jour.",
+      "reconfigure_successful": "Identifiants mis à jour.",
+      "wrong_account": "Ces identifiants correspondent à une autre passerelle Solem."
     }
   }
 }

@@ -1,4 +1,4 @@
-"""Switch entities: one per irrigation zone + one per program."""
+"""Switch entities: one per irrigation zone."""
 from __future__ import annotations
 
 import logging
@@ -29,9 +29,6 @@ async def async_setup_entry(
 
     for output in coordinator.data.get("outputs", []):
         entities.append(SolemZoneSwitch(coordinator, output))
-
-    for program in coordinator.data.get("programs", []):
-        entities.append(SolemProgramSwitch(coordinator, program))
 
     async_add_entities(entities)
 
@@ -162,94 +159,3 @@ class SolemZoneSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
             raise
         await self.coordinator.async_request_refresh()
 
-
-class SolemProgramSwitch(CoordinatorEntity[SolemCoordinator], SwitchEntity):
-    """Switch to run/stop a watering program."""
-
-    _attr_icon = "mdi:calendar-clock"
-
-    def __init__(self, coordinator: SolemCoordinator, program: dict[str, Any]) -> None:
-        super().__init__(coordinator)
-        self._program = program
-        self._program_index = program["index"]          # 0-based
-        self._program_number = self._program_index + 1  # 1-based on the device
-        self._attr_unique_id = f"solem_program_{program['id']}"
-        self._attr_name = program.get("name", f"Programme {chr(65 + self._program_index)}")
-        self._attr_device_info = _device_info(coordinator)
-        self._optimistic_on: bool | None = None
-        self._optimistic_at: datetime | None = None
-
-    def _coordinator_is_on(self) -> bool:
-        status = self.coordinator.data.get("status", {})
-        return (
-            status.get("state") == WATERING_STATE_ON
-            and status.get("runningProgram") == self._program_number
-        )
-
-    @property
-    def is_on(self) -> bool:
-        if self._optimistic_on is not None:
-            return self._optimistic_on
-        return self._coordinator_is_on()
-
-    def _handle_coordinator_update(self) -> None:
-        if self._optimistic_on is not None:
-            actual = self._coordinator_is_on()
-            if self._optimistic_on == actual:
-                self._optimistic_on = None
-                self._optimistic_at = None
-            else:
-                age = (
-                    (datetime.now(timezone.utc) - self._optimistic_at).total_seconds()
-                    if self._optimistic_at else 999
-                )
-                if age > 300:
-                    self._optimistic_on = None
-                    self._optimistic_at = None
-        super()._handle_coordinator_update()
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        p = self._program
-        starts = [f"{t // 60:02d}:{t % 60:02d}" for t in p.get("startTimes", []) if t != -1]
-        return {
-            "program_index": self._program_index,
-            "water_budget": p.get("waterBudget"),
-            "start_times": starts,
-            "stations_duration_s": p.get("stationsDuration", []),
-        }
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        self._optimistic_on = True
-        self._optimistic_at = datetime.now(timezone.utc)
-        self.async_write_ha_state()
-        try:
-            await self.coordinator.api.manual_run_program(
-                relay_serial=self.coordinator.relay_serial,
-                controller_suffix=self.coordinator.data["controller_suffix"],
-                program=self._program_number,
-                controller_id=self.coordinator.data["controller_id"],
-            )
-        except Exception as err:
-            self._optimistic_on = None
-            self._optimistic_at = None
-            self.async_write_ha_state()
-            raise
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        self._optimistic_on = False
-        self._optimistic_at = datetime.now(timezone.utc)
-        self.async_write_ha_state()
-        try:
-            await self.coordinator.api.manual_stop(
-                relay_serial=self.coordinator.relay_serial,
-                controller_suffix=self.coordinator.data["controller_suffix"],
-                controller_id=self.coordinator.data["controller_id"],
-            )
-        except Exception as err:
-            self._optimistic_on = None
-            self._optimistic_at = None
-            self.async_write_ha_state()
-            raise
-        await self.coordinator.async_request_refresh()

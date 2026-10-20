@@ -36,11 +36,9 @@ Commands sent via `POST /api/module/{relay_sn}/manual/{controller_suffix}` reach
 ## Features
 
 - **Zone switches** — one switch per irrigation zone (manual start/stop)
-- **Program switches** — one switch per watering program (A/B/C)
 - **Zone duration** — configurable per-zone watering duration (number entity, 1–240 min)
-- **Rain delay** — suspend all automatic watering for N days
 - **Sensors**:
-  - Watering state (Idle / Zone N active / Program N running)
+  - Watering state (Idle / Zone N active / Program N running / Rain delay)
   - Currently running zone
   - Currently running program
   - Last LoRa radio communication timestamp
@@ -101,7 +99,7 @@ You will need two values from your mysolem.com session, captured via a proxy too
 
 ### Token renewal
 
-When the token expires (~60 days), recapture it from Proxyman and update the integration via **Settings → Devices & Services → Solem Irrigation → Reconfigure**.
+When the token expires (~60 days), Home Assistant raises a **re-authentication** notification: recapture the token and cookie from Proxyman and paste them in the form. You can also update them at any time via **Settings → Devices & Services → Solem Irrigation → ⋮ → Reconfigure**.
 
 ---
 
@@ -128,9 +126,6 @@ Cookie: solem-irrigation-platform.sid={cookie}
 
 # Stop all watering
 {"watering": {"action": 0}}
-
-# Run program P (1–3) — unconfirmed
-{"watering": {"action": 1, "program": P}}
 ```
 
 `controller_suffix` = last 3 bytes of the controller MAC address without colons  
@@ -162,8 +157,7 @@ GET /api/getUserWithHisModules
 ## Known limitations
 
 - **Authentication cannot be automated** — the server requires an existing mobile app session cookie. Token renewal requires Proxyman capture.
-- **Program run confirmation** — `action: 1` for running a program has not been confirmed via capture; it may require a different payload.
-- **Rain delay control** — the exact API payload for rain delay has not been captured yet.
+- **No program start / rain delay control** — the payloads for running a program and setting a rain delay have not been captured from the official app yet, so these controls are not exposed. The current program and rain delay are still reported by the status sensors.
 - **Single relay** — only the first LRMB10 relay in the account is used.
 
 ---

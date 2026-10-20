@@ -159,22 +159,6 @@ class SolemAPI:
         await self._report_command(controller_id, {"watering": watering})
         return result
 
-    async def manual_run_program(
-        self,
-        relay_serial: str,
-        controller_suffix: str,
-        program: int,
-        controller_id: str,
-    ) -> dict[str, Any]:
-        """Run a program (program is 1-based).
-
-        action: 1 = run program (to confirm by capturing app in Proxyman).
-        """
-        watering = {"action": 1, "program": program, "time": "00:00"}
-        result = await self._manual_command(relay_serial, controller_suffix, watering)
-        await self._report_command(controller_id, {"watering": watering})
-        return result
-
     async def _manual_command(
         self,
         relay_serial: str,
